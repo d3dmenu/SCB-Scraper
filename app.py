@@ -23,7 +23,6 @@
 #  */
 
 import os
-import csv
 import time         
 import mysql.connector
 
@@ -62,6 +61,7 @@ class config():
             database = self.database
         )
 
+        # Web driver
         self.cursor = self.db.cursor()
     
     def db_Loadtransaction(self):
@@ -80,10 +80,10 @@ class config():
         self.db.commit()    
     
 
-# Class payment
-class payment():
+# Class SCB Payment
+class SCB():
 
-    # Methid payment
+    # Method SCB
 
     def __init__(self, path, url, user, passwd, mode):
         # path file
@@ -95,13 +95,16 @@ class payment():
         self.passwd = passwd
         # web driver mode [Enabled / Disabled]
         self.mode = mode
-        # Save to database
+        # save to database
         self.data = []
         self.dict = {}
-
+        # multiple Page
+        self.multiple = 0
+        # loop variable 
+        self.index_month = 1
         # base element
         self.element = {"txtlogin": "//*[@id='LOGIN']", 
-                        "txtpsasword": "//*[@id='LogIn']/table/tbody/tr[3]/td/label/input",
+                        "txtpassword": "//*[@id='LogIn']/table/tbody/tr[3]/td/label/input",
                         "btnsubmit": "//*[@id='lgin']", 
                         "Account": "//*[@id='Image3']",
                         "View": "//*[@id='DataProcess_SaCaGridView_SaCaView_LinkButton_0']",
@@ -110,10 +113,100 @@ class payment():
                         "Combobox": "//*[@id='DataProcess_ddlMonth",
                         "Table": "//*[@id='DataProcess_GridView']",
                         "Mainpage": "//*[@id='mainpage']",
-                        "Back": "//*[@id='back']"}
+                        "Back": "//*[@id='back']",
+                        "Next": "//*[@id='DataProcess_GridView']/tbody/tr[1]/td/table/tbody/tr/td/a"}
     
-    def Scrap_month(self, month, loadall=True):
+    
+    def Scrap_Loader(self, month, loadall):    
+
+        ''' Detail function Scrap_transactions '''
+        ''' if loadall = false -> Scrap transactions by month '''
+        ''' if loadall = true -> Scrap transactions backup 1 year '''
+
+        if loadall == False:
+            # Set multiple to default value
+            self.multiple = 0
+            # Combobox select transactions
+            select_fr = Select(self.driver.find_element_by_xpath("//*[@id='DataProcess_ddlMonth']"))
+            # Select by value
+            select_fr.select_by_index(month)
+
+            # Load data transactions
+            rows = self.driver.find_elements_by_xpath("//*[@id='DataProcess_GridView']")
+            pattern = ["Date", "Time", "Type", "Channel", "Detial", "CheckID", "WithDraw", "Deposit", "Balance"]
+            for row in rows:
+                temp = []
+                columns = row.find_elements_by_css_selector("td") # check bv td tag
+
+                for column in columns:
+                    if len(temp) == 9: # Columns
+                        self.data.append(temp)
+                        temp = []
+                    if column.text != "Next":
+                        if column.text != "Previous": temp.append(column.text)
+                    else:
+                        self.multiple = 1
+
+            if self.multiple:
+                # click for next page 
+                self.driver.find_element_by_xpath(self.element["Next"]).click()
+
+                ''' Recursive function '''
+                return SCB.Scrap_Loader(self, month, loadall)
+
+            else:
+
+                return self.data
+
+        else:
+
+            # Set multiple to default value
+            self.multiple = 0
+            
+            while self.index_month != 13:
+
+                # Combobox select transactions
+                select_fr = Select(self.driver.find_element_by_xpath("//*[@id='DataProcess_ddlMonth']"))
+                # Select by value
+                select_fr.select_by_index(self.index_month)
+
+                # Load data transactions
+                rows = self.driver.find_elements_by_xpath("//*[@id='DataProcess_GridView']")
+                pattern = ["Date", "Time", "Type", "Channel", "Detial", "CheckID", "WithDraw", "Deposit", "Balance"]
+                for row in rows:
+                    temp = []
+                    columns = row.find_elements_by_css_selector("td")
+
+                    for column in columns:
+                        if len(temp) == 9:
+                            self.data.append(temp)
+                            temp = []
+                        if column.text != "Next":
+                            if column.text != "Previous": temp.append(column.text)
+                        else:
+                            self.multiple = 1
+            
+                if self.multiple:
+                    # click for next page 
+                    self.driver.find_element_by_xpath(self.element["Next"]).click()
+
+                    ''' Recursive function '''
+                    return SCB.Scrap_Loader(self, month, loadall)
+
+                else:
+                    ''' next month | call function (recursive function)'''
+                    self.index_month += 1
+                    return SCB.Scrap_Loader(self, month, loadall)
+
+            return self.data  
+                
+
+    def Scrap_model(self, month, loadall):
         
+        ''' SCB Easy Scrap Transaction '''
+        ''' Created by Rec0de (Nick.NET) '''
+        ''' Version 1.0.12.2 (Beta) '''
+
         if self.mode:
             options = webdriver.ChromeOptions()
             options.add_argument("--ignore-certificate-errors")
@@ -133,7 +226,7 @@ class payment():
         # Username
         self.driver.find_element_by_xpath(self.element["txtlogin"]).send_keys(self.user, Keys.TAB)
         # Password
-        state = self.driver.find_element_by_xpath("//*[@id='LogIn']/table/tbody/tr[3]/td/label/input")
+        state = self.driver.find_element_by_xpath(self.element["txtpassword"])
         state.send_keys(self.passwd)
         # Submit button
         self.driver.find_element_by_xpath(self.element["btnsubmit"]).click()
@@ -144,52 +237,11 @@ class payment():
         # Dataprogress
         self.driver.find_element_by_xpath(self.element["Dataprogress3"]).click()
 
+            
+        ''' Call function for Scrap Transaction '''
+        return SCB.Scrap_Loader(self, month, loadall)
+        # print(month, loadall, type(loadall))
 
-        # Select by text
-        # select_fr.select_by_visible_text('กันยายน 2563')
-    
-        if loadall == False:
-
-            # Combobox select transactions
-            select_fr = Select(self.driver.find_element_by_xpath("//*[@id='DataProcess_ddlMonth']"))
-            # Select by value
-            select_fr.select_by_index(month)
-
-            # Load data transactions
-            rows = self.driver.find_elements_by_xpath("//*[@id='DataProcess_GridView']")
-            pattern = ["Date", "Time", "Type", "Channel", "Detial", "CheckID", "WithDraw", "Deposit", "Balance"]
-            for row in rows:
-                temp = []
-                columns = row.find_elements_by_css_selector("td") # check bv td tag
-
-                for column in columns:
-                    if len(temp) == 9: # Columns
-                        self.data.append(temp)
-                        temp = []
-                    temp.append(column.text)
-                    
-            return self.data
-        else:
-            for m in range(1, 12):
-                # Combobox select transactions
-                select_fr = Select(self.driver.find_element_by_xpath("//*[@id='DataProcess_ddlMonth']"))
-                # Select by value
-                print(m)
-                select_fr.select_by_index(m)
-
-                # Load data transactions
-                rows = self.driver.find_elements_by_xpath("//*[@id='DataProcess_GridView']")
-                pattern = ["Date", "Time", "Type", "Channel", "Detial", "CheckID", "WithDraw", "Deposit", "Balance"]
-                for row in rows:
-                    temp = []
-                    columns = row.find_elements_by_css_selector("td")
-
-                    for column in columns:
-                        if len(temp) == 9:
-                            self.data.append(temp)
-                            temp = []
-                        temp.append(column.text)
-            return self.data
     
     def Scrap_realtime(self):
         count = 0
@@ -260,26 +312,29 @@ class payment():
                 self.driver.find_element_by_xpath(self.element["Mainpage"]).click()
             except:
                 pass
+            
             self.driver.refresh()
                         
 
 if __name__ == "__main__":
 
+    # Text Present Program
+    print("\nSCB Easy Scrap Transactions\n----------------------------")
+
     # Authentication
-    conn = config("localhost", "root", "123456", "nemo", "3306")
+    conn = config("localhost", "root", "12345678", "nemo", "3306")
 
     scb_admin = input("Username: ")
     scb_password = getpass()
 
     # Object class variable
-    sc = payment(path, url, scb_admin, scb_password, False)
+    sc = SCB(path, url, scb_admin, scb_password, False)
 
-    sc.Scrap_realtime()
+    # sc.Scrap_realtime()
 
+    # Download History Transactions
+    ts = sc.Scrap_model(1, True)
 
-    # # Download History Transactions
-    # ts = sc.Scrap_month(2, True)
-    # print(ts)
-
-    # for idx in range(len(ts)):
-    #     conn.db_Insertdata(ts[idx][0], ts[idx][1], ts[idx][2], ts[idx][3], ts[idx][4], ts[idx][5], ts[idx][6], ts[idx][7], ts[idx][8])
+    for idx in range(len(ts)):
+        # print(ts[idx])
+        conn.db_Insertdata(ts[idx][0], ts[idx][1], ts[idx][2], ts[idx][3], ts[idx][4], ts[idx][5], ts[idx][6], ts[idx][7], ts[idx][8])
