@@ -330,11 +330,11 @@ if __name__ == "__main__":
     # Object class variable
     sc = SCB(path, url, scb_admin, scb_password, False)
 
-    # sc.Scrap_realtime()
+    sc.Scrap_realtime()
 
     # Download History Transactions
-    ts = sc.Scrap_model(1, True)
+    # ts = sc.Scrap_model(1, True)
 
-    for idx in range(len(ts)):
-        # print(ts[idx])
-        conn.db_Insertdata(ts[idx][0], ts[idx][1], ts[idx][2], ts[idx][3], ts[idx][4], ts[idx][5], ts[idx][6], ts[idx][7], ts[idx][8])
+    # for idx in range(len(ts)):
+    #     print(ts[idx])
+    #     conn.db_Insertdata(ts[idx][0], ts[idx][1], ts[idx][2], ts[idx][3], ts[idx][4], ts[idx][5], ts[idx][6], ts[idx][7], ts[idx][8])
